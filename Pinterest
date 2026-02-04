@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pinterest Video Downloader</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        h1 { color: #e60023; margin-bottom: 20px; font-size: 2em; }
+        .input-area { margin: 30px 0; }
+        input {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #e60023;
+        }
+        button {
+            background: #e60023;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px 0;
+            transition: transform 0.3s, background 0.3s;
+            width: 100%;
+        }
+        button:hover {
+            background: #cc001f;
+            transform: translateY(-2px);
+        }
+        .result {
+            margin-top: 30px;
+            display: none;
+        }
+        video {
+            width: 100%;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 3px solid #f0f0f0;
+        }
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #e60023;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .message {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: none;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📥 Pinterest Video Downloader</h1>
+        <p>Enter Pinterest video URL to download</p>
+        
+        <div class="input-area">
+            <input type="text" id="urlInput" 
+                   placeholder="https://www.pinterest.com/pin/123456789/"
+                   value="https://pin.it/6x5XrK7">
+            <button onclick="startDownload()">Download Video</button>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing video...</p>
+        </div>
+        
+        <div class="message" id="message"></div>
+        
+        <div class="result" id="result">
+            <h2>✅ Video Ready!</h2>
+            <video id="videoPlayer" controls></video>
+            <button onclick="downloadVideo()">💾 Save to Device</button>
+        </div>
+    </div>
+
+    <script>
+        let currentVideoUrl = '';
+        
+        async function startDownload() {
+            const url = document.getElementById('urlInput').value.trim();
+            if(!url) {
+                showMessage('Please enter a URL', 'error');
+                return;
+            }
+            
+            if(!url.includes('pinterest.com') && !url.includes('pin.it')) {
+                showMessage('Please enter a valid Pinterest URL', 'error');
+                return;
+            }
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('result').style.display = 'none';
+            hideMessage();
+            
+            try {
+                // Try multiple APIs
+                const videoData = await getVideoFromAPI(url);
+                
+                if(videoData && videoData.url) {
+                    currentVideoUrl = videoData.url;
+                    document.getElementById('videoPlayer').src = videoData.url;
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('result').style.display = 'block';
+                    showMessage('Video found successfully!', 'success');
+                } else {
+                    throw new Error('No video found');
+                }
+            } catch(error) {
+                document.getElementById('loading').style.display = 'none';
+                showMessage('Failed to download: ' + error.message, 'error');
+            }
+        }
+        
+        async function getVideoFromAPI(url) {
+            // List of free APIs
+            const apis = [
+                `https://api.safone.dev/pinterest/download?url=${encodeURIComponent(url)}`,
+                `https://pinterest-api-three.vercel.app/api/pinterest?url=${encodeURIComponent(url)}`,
+                `https://api.allorigins.win/raw?url=${encodeURIComponent('https://pinterestvideodownloader.com/download?url=' + url)}`
+            ];
+            
+            for(let api of apis) {
+                try {
+                    const response = await fetch(api);
+                    const data = await response.json();
+                    
+                    if(data.videos && data.videos[0]) {
+                        return { url: data.videos[0].url };
+                    }
+                    if(data.url) {
+                        return { url: data.url };
+                    }
+                } catch(e) {
+                    console.log('API failed:', api);
+                }
+            }
+            
+            throw new Error('All APIs failed');
+        }
+        
+        function downloadVideo() {
+            if(currentVideoUrl) {
+                const link = document.createElement('a');
+                link.href = currentVideoUrl;
+                link.download = `pinterest_video_${Date.now()}.mp4`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showMessage('Download started!', 'success');
+            }
+        }
+        
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+        }
+        
+        function hideMessage() {
+            document.getElementById('message').style.display = 'none';
+        }
+        
+        // Auto-detect if user pastes a Pinterest URL
+        document.getElementById('urlInput').addEventListener('paste', function(e) {
+            setTimeout(() => {
+                const pastedText = this.value;
+                if(pastedText.includes('pinterest.com') || pastedText.includes('pin.it')) {
+                    showMessage('Paste detected! Click Download', 'success');
+                }
+            }, 100);
+        });
+    </script>
+</body>
+</html>
