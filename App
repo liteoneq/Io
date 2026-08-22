@@ -24,9 +24,9 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 
 @DesignerComponent(
-    version = 95,
-    versionName = "10.8.0",
-    description = "Dynamic components extension with full Advanced Button visibility and correct Sockets.",
+    version = 96,
+    versionName = "10.9.0",
+    description = "Fully independent Advanced Button components with correct Sockets and visibility.",
     category = ComponentCategory.EXTENSION,
     nonVisible = true,
     iconName = "",
@@ -37,7 +37,6 @@ public class Dynamicapp extends AndroidNonvisibleComponent {
 
     private static final String TAG = "Dynamicapp";
 
-    // Hashmaps for tracking dynamic components
     private final HashMap<String, AndroidViewComponent> BUTTONS = new HashMap<>();
     private final HashMap<String, AndroidViewComponent> CARDS = new HashMap<>();
     private final HashMap<String, AndroidViewComponent> CARD_COLUMNS = new HashMap<>();
@@ -48,18 +47,19 @@ public class Dynamicapp extends AndroidNonvisibleComponent {
     private final HashMap<String, AndroidViewComponent> ADVANCED_BUTTONS = new HashMap<>();
     private final HashMap<String, AdvancedButtonComponents> ADVANCED_BUTTON_DATA = new HashMap<>();
 
-    // Inner class to hold Advanced Button state
     private static class AdvancedButtonComponents {
         AndroidViewComponent card;
         AndroidViewComponent image;
         AndroidViewComponent mainText;
         AndroidViewComponent fixedText1;
         AndroidViewComponent fixedText2;
-        AndroidViewComponent fixedLayout;
-        AndroidViewComponent container;
+        AndroidViewComponent fixedLayout; // Container for fixed texts
+        AndroidViewComponent container;   // Main layout container
+        
         int originalBackgroundColor = 0xFFFFFFFF;
         int layoutDirection = 0; // 0=Left, 1=Right, 2=Top, 3=Bottom
         int textAlignment = 0;   // 0=Left, 1=Center, 2=Right
+        
         String fixedText1Value = "";
         String fixedText2Value = "";
         int fixedText1Size = 12;
@@ -68,15 +68,16 @@ public class Dynamicapp extends AndroidNonvisibleComponent {
         int fixedText2Color = 0xFF666666;
         boolean fixedText1Bold = false;
         boolean fixedText2Bold = false;
+        
         int verticalTextGap = 5;
         boolean clickFeedbackEnabled = true;
     }
 
-    // Default Properties Fields
     private int defaultCardBackgroundColor = 0xFFFFFFFF;
     private int defaultButtonBackgroundColor = 0xFF2196F3;
     private int defaultTextColor = 0xFF000000;
     private boolean defaultCardScrollEnabled = false;
+    
     private int defaultAdvancedButtonWidth = 250;
     private int defaultAdvancedButtonHeight = 80;
     private int defaultAdvancedButtonPadding = 10;
@@ -337,15 +338,16 @@ public class Dynamicapp extends AndroidNonvisibleComponent {
     }
 
     // ============================================================
-    // ADVANCED BUTTONS
+    // ADVANCED BUTTONS (INDEPENDENT COMPONENTS LOGIC)
     // ============================================================
-    @SimpleFunction(description = "Creates an advanced button with image, main text and two fixed texts.")
+    @SimpleFunction(description = "Creates an advanced button base card.")
     public void CreateAdvancedButton(String id, Component arrangement, String imagePath, String mainText, String fixedText1, String fixedText2) {
         validateId(id);
         if (arrangement == null) throw new YailRuntimeError("Arrangement cannot be null.", TAG);
         try {
             ComponentContainer parent = asContainer(arrangement, "Arrangement");
             DeleteAdvancedButton(id);
+            
             AndroidViewComponent card = dynCreate(parent, "MakeroidCardView");
             setSingleProp(card, "Width", Integer.valueOf(this.defaultAdvancedButtonWidth));
             setSingleProp(card, "Height", Integer.valueOf(this.defaultAdvancedButtonHeight));
@@ -362,6 +364,7 @@ public class Dynamicapp extends AndroidNonvisibleComponent {
             this.ADVANCED_BUTTONS.put(id, card);
             this.ADVANCED_BUTTON_DATA.put(id, components);
             
+            // Add components independently based on input
             if (mainText != null && !mainText.isEmpty()) {
                 SetupAdvancedButtonMainText(id, mainText, this.defaultAdvancedButtonMainTextSize, this.defaultAdvancedButtonMainTextColor, 0, true);
             }
@@ -371,8 +374,10 @@ public class Dynamicapp extends AndroidNonvisibleComponent {
             if (imagePath != null && !imagePath.isEmpty()) {
                 SetupAdvancedButtonImage(id, imagePath, this.defaultAdvancedButtonImageWidth, this.defaultAdvancedButtonImageHeight, this.defaultAdvancedButtonImageCornerRadius);
             } else {
+                // If no image, still assemble layout to show texts
                 AssembleAdvancedButtonLayout(id, 0);
             }
+            
             makeAdvancedButtonClickable(id);
         } catch (Exception e) {
             throw new YailRuntimeError("CreateAdvancedButton failed: " + safeMessage(e), TAG);
@@ -395,15 +400,19 @@ public class Dynamicapp extends AndroidNonvisibleComponent {
             try {
                 ComponentContainer cardContainer = asContainer(components.card, "MakeroidCardView");
                 if (components.image != null) removeComponentFromParent(components.image);
+                
                 if (imagePath != null && !imagePath.isEmpty()) {
                     AndroidViewComponent image = dynCreate(cardContainer, "Image");
                     setSingleProp(image, "Picture", imagePath);
                     setSingleProp(image, "Width", Integer.valueOf(imageWidth));
-                    setSingleProp(image, "Height", Integer.valueOf(-2));
+                    setSingleProp(image, "Height", Integer.valueOf(-2)); // Auto height
                     if (imageCornerRadius > 0) applyImageShape(image, imageWidth == imageHeight, imageCornerRadius);
                     components.image = image;
-                    AssembleAdvancedButtonLayout(id, components.layoutDirection);
+                } else {
+                    components.image = null;
                 }
+                // Re-assemble layout immediately with whatever exists
+                AssembleAdvancedButtonLayout(id, components.layoutDirection);
             } catch (Exception e) { e.printStackTrace(); }
         }
     }
@@ -416,16 +425,23 @@ public class Dynamicapp extends AndroidNonvisibleComponent {
             try {
                 ComponentContainer cardContainer = asContainer(components.card, "MakeroidCardView");
                 if (components.mainText != null) removeComponentFromParent(components.mainText);
-                AndroidViewComponent mainLabel = dynLabel(cardContainer, mainFontSize, isBold, mainColor, mainText == null ? "" : mainText);
-                setSingleProp(mainLabel, "TextAlignment", Integer.valueOf(alignment));
-                components.mainText = mainLabel;
-                components.textAlignment = alignment;
-                makeLabelClickable(mainLabel, id, "main", mainText == null ? "" : mainText);
+                
+                if (mainText != null && !mainText.isEmpty()) {
+                    AndroidViewComponent mainLabel = dynLabel(cardContainer, mainFontSize, isBold, mainColor, mainText);
+                    setSingleProp(mainLabel, "TextAlignment", Integer.valueOf(alignment));
+                    components.mainText = mainLabel;
+                    components.textAlignment = alignment;
+                    makeLabelClickable(mainLabel, id, "main", mainText);
+                } else {
+                    components.mainText = null;
+                }
+                // Re-assemble layout immediately
+                AssembleAdvancedButtonLayout(id, components.layoutDirection);
             } catch (Exception e) { e.printStackTrace(); }
         }
     }
 
-    @SimpleFunction(description = "Configures Fixed Sub-Texts with Bold support. Gap is fixed at 20px.")
+    @SimpleFunction(description = "Configures Fixed Sub-Texts with Bold support.")
     public void SetupAdvancedButtonFixedTexts(String id, String fixedText1, String fixedText2, int fixedFontSize1, int fixedColor1, boolean isBold1, int fixedFontSize2, int fixedColor2, boolean isBold2) {
         validateId(id);
         AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
@@ -434,39 +450,56 @@ public class Dynamicapp extends AndroidNonvisibleComponent {
                 ComponentContainer cardContainer = asContainer(components.card, "MakeroidCardView");
                 if (components.fixedLayout != null) removeComponentFromParent(components.fixedLayout);
                 
-                AndroidViewComponent fixedLayout = dynCreate(cardContainer, "HorizontalArrangement");
-                setSingleProp(fixedLayout, "AlignHorizontal", Integer.valueOf(1));
-                setSingleProp(fixedLayout, "AlignVertical", Integer.valueOf(1));
-                setSingleProp(fixedLayout, "Width", Integer.valueOf(-2));
-                setSingleProp(fixedLayout, "Height", Integer.valueOf(-2));
-                setSingleProp(fixedLayout, "ContentPaddingLeft", Integer.valueOf(10));
-                setSingleProp(fixedLayout, "ContentPaddingRight", Integer.valueOf(10));
-                components.fixedLayout = fixedLayout;
+                boolean hasFixed1 = fixedText1 != null && !fixedText1.isEmpty();
+                boolean hasFixed2 = fixedText2 != null && !fixedText2.isEmpty();
                 
-                ComponentContainer fixedContainer = asContainer(fixedLayout, "HorizontalArrangement");
-                if (fixedText1 != null && !fixedText1.isEmpty()) {
-                    AndroidViewComponent fixedLabel1 = dynLabel(fixedContainer, fixedFontSize1, isBold1, fixedColor1, fixedText1);
-                    components.fixedText1 = fixedLabel1;
-                    components.fixedText1Value = fixedText1;
-                    components.fixedText1Size = fixedFontSize1;
-                    components.fixedText1Color = fixedColor1;
-                    components.fixedText1Bold = isBold1;
-                    makeLabelClickable(fixedLabel1, id, "fixed1", fixedText1);
+                if (hasFixed1 || hasFixed2) {
+                    AndroidViewComponent fixedLayout = dynCreate(cardContainer, "HorizontalArrangement");
+                    setSingleProp(fixedLayout, "AlignHorizontal", Integer.valueOf(1));
+                    setSingleProp(fixedLayout, "AlignVertical", Integer.valueOf(1));
+                    setSingleProp(fixedLayout, "Width", Integer.valueOf(-2));
+                    setSingleProp(fixedLayout, "Height", Integer.valueOf(-2));
+                    setSingleProp(fixedLayout, "ContentPaddingLeft", Integer.valueOf(10));
+                    setSingleProp(fixedLayout, "ContentPaddingRight", Integer.valueOf(10));
+                    components.fixedLayout = fixedLayout;
+                    
+                    ComponentContainer fixedContainer = asContainer(fixedLayout, "HorizontalArrangement");
+                    
+                    if (hasFixed1) {
+                        AndroidViewComponent fixedLabel1 = dynLabel(fixedContainer, fixedFontSize1, isBold1, fixedColor1, fixedText1);
+                        components.fixedText1 = fixedLabel1;
+                        components.fixedText1Value = fixedText1;
+                        components.fixedText1Size = fixedFontSize1;
+                        components.fixedText1Color = fixedColor1;
+                        components.fixedText1Bold = isBold1;
+                        makeLabelClickable(fixedLabel1, id, "fixed1", fixedText1);
+                    } else {
+                        components.fixedText1 = null;
+                    }
+                    
+                    if (hasFixed2) {
+                        AndroidViewComponent fixedLabel2 = dynLabel(fixedContainer, fixedFontSize2, isBold2, fixedColor2, fixedText2);
+                        components.fixedText2 = fixedLabel2;
+                        components.fixedText2Value = fixedText2;
+                        components.fixedText2Size = fixedFontSize2;
+                        components.fixedText2Color = fixedColor2;
+                        components.fixedText2Bold = isBold2;
+                        makeLabelClickable(fixedLabel2, id, "fixed2", fixedText2);
+                    } else {
+                        components.fixedText2 = null;
+                    }
+                } else {
+                    components.fixedLayout = null;
+                    components.fixedText1 = null;
+                    components.fixedText2 = null;
                 }
-                if (fixedText2 != null && !fixedText2.isEmpty()) {
-                    AndroidViewComponent fixedLabel2 = dynLabel(fixedContainer, fixedFontSize2, isBold2, fixedColor2, fixedText2);
-                    components.fixedText2 = fixedLabel2;
-                    components.fixedText2Value = fixedText2;
-                    components.fixedText2Size = fixedFontSize2;
-                    components.fixedText2Color = fixedColor2;
-                    components.fixedText2Bold = isBold2;
-                    makeLabelClickable(fixedLabel2, id, "fixed2", fixedText2);
-                }
+                // Re-assemble layout immediately
+                AssembleAdvancedButtonLayout(id, components.layoutDirection);
             } catch (Exception e) { e.printStackTrace(); }
         }
     }
 
-    @SimpleFunction(description = "Assembles the layout based on current direction.")
+    @SimpleFunction(description = "Assembles the layout based on current direction and existing components.")
     public void AssembleAdvancedButtonLayout(String id, int direction) {
         validateId(id);
         AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
@@ -474,8 +507,12 @@ public class Dynamicapp extends AndroidNonvisibleComponent {
             try {
                 ComponentContainer cardContainer = asContainer(components.card, "MakeroidCardView");
                 if (components.container != null) removeComponentFromParent(components.container);
-                AndroidViewComponent container = createLayout(cardContainer, components.image, components.mainText, components.fixedLayout, direction, components.verticalTextGap, components.textAlignment);
-                components.container = container;
+                
+                // Only create layout if there is at least one component
+                if (components.image != null || components.mainText != null || components.fixedLayout != null) {
+                    AndroidViewComponent container = createLayout(cardContainer, components.image, components.mainText, components.fixedLayout, direction, components.verticalTextGap, components.textAlignment);
+                    components.container = container;
+                }
             } catch (Exception e) { e.printStackTrace(); }
         }
     }
@@ -1021,7 +1058,7 @@ public class Dynamicapp extends AndroidNonvisibleComponent {
     }
 
     // ============================================================
-    // LAYOUT HELPERS FOR ADVANCED BUTTON
+    // LAYOUT HELPERS FOR ADVANCED BUTTON (SAFE & INDEPENDENT)
     // ============================================================
     private static AndroidViewComponent createLayout(ComponentContainer parent, AndroidViewComponent image, AndroidViewComponent mainLabel, AndroidViewComponent fixedLayout, int direction, int verticalGap, int textAlignment) throws Exception {
         switch (direction) {
@@ -1040,15 +1077,27 @@ public class Dynamicapp extends AndroidNonvisibleComponent {
         setSingleProp(container, "Width", Integer.valueOf(-2));
         setSingleProp(container, "Height", Integer.valueOf(-2));
         ComponentContainer containerTop = asContainer(container, "VerticalArrangement");
-        if (image != null) { moveComponentToNewParent(image, container); createSpacer(containerTop, 10); }
-        AndroidViewComponent textLayout = dynCreate(containerTop, "VerticalArrangement");
-        setSingleProp(textLayout, "AlignHorizontal", Integer.valueOf(textAlignment == 0 ? 1 : (textAlignment == 2 ? 2 : 1)));
-        setSingleProp(textLayout, "AlignVertical", Integer.valueOf(1));
-        setSingleProp(textLayout, "Width", Integer.valueOf(-2));
-        setSingleProp(textLayout, "Height", Integer.valueOf(-2));
-        ComponentContainer textContainer = asContainer(textLayout, "VerticalArrangement");
-        if (mainLabel != null) { moveComponentToNewParent(mainLabel, textLayout); createSpacer(textContainer, verticalGap); }
-        if (fixedLayout != null) moveComponentToNewParent(fixedLayout, textLayout);
+        
+        if (image != null) { 
+            moveComponentToNewParent(image, container); 
+            // Only add spacer if there is something below it
+            if (mainLabel != null || fixedLayout != null) createSpacer(containerTop, 10); 
+        }
+        
+        if (mainLabel != null || fixedLayout != null) {
+            AndroidViewComponent textLayout = dynCreate(containerTop, "VerticalArrangement");
+            setSingleProp(textLayout, "AlignHorizontal", Integer.valueOf(textAlignment == 0 ? 1 : (textAlignment == 2 ? 2 : 1)));
+            setSingleProp(textLayout, "AlignVertical", Integer.valueOf(1));
+            setSingleProp(textLayout, "Width", Integer.valueOf(-2));
+            setSingleProp(textLayout, "Height", Integer.valueOf(-2));
+            ComponentContainer textContainer = asContainer(textLayout, "VerticalArrangement");
+            
+            if (mainLabel != null) { 
+                moveComponentToNewParent(mainLabel, textLayout); 
+                if (fixedLayout != null) createSpacer(textContainer, verticalGap);
+            }
+            if (fixedLayout != null) moveComponentToNewParent(fixedLayout, textLayout);
+        }
         return container;
     }
 
@@ -1059,16 +1108,27 @@ public class Dynamicapp extends AndroidNonvisibleComponent {
         setSingleProp(container, "Width", Integer.valueOf(-2));
         setSingleProp(container, "Height", Integer.valueOf(-2));
         ComponentContainer containerBottom = asContainer(container, "VerticalArrangement");
-        AndroidViewComponent textLayout = dynCreate(containerBottom, "VerticalArrangement");
-        setSingleProp(textLayout, "AlignHorizontal", Integer.valueOf(textAlignment == 0 ? 1 : (textAlignment == 2 ? 2 : 1)));
-        setSingleProp(textLayout, "AlignVertical", Integer.valueOf(1));
-        setSingleProp(textLayout, "Width", Integer.valueOf(-2));
-        setSingleProp(textLayout, "Height", Integer.valueOf(-2));
-        ComponentContainer textContainer = asContainer(textLayout, "VerticalArrangement");
-        if (mainLabel != null) { moveComponentToNewParent(mainLabel, textLayout); createSpacer(textContainer, verticalGap); }
-        if (fixedLayout != null) moveComponentToNewParent(fixedLayout, textLayout);
-        createSpacer(containerBottom, 10);
-        if (image != null) moveComponentToNewParent(image, container);
+        
+        if (mainLabel != null || fixedLayout != null) {
+            AndroidViewComponent textLayout = dynCreate(containerBottom, "VerticalArrangement");
+            setSingleProp(textLayout, "AlignHorizontal", Integer.valueOf(textAlignment == 0 ? 1 : (textAlignment == 2 ? 2 : 1)));
+            setSingleProp(textLayout, "AlignVertical", Integer.valueOf(1));
+            setSingleProp(textLayout, "Width", Integer.valueOf(-2));
+            setSingleProp(textLayout, "Height", Integer.valueOf(-2));
+            ComponentContainer textContainer = asContainer(textLayout, "VerticalArrangement");
+            
+            if (mainLabel != null) { 
+                moveComponentToNewParent(mainLabel, textLayout); 
+                if (fixedLayout != null) createSpacer(textContainer, verticalGap);
+            }
+            if (fixedLayout != null) moveComponentToNewParent(fixedLayout, textLayout);
+        }
+        
+        if (image != null) {
+            // Only add spacer if there is something above it
+            if (mainLabel != null || fixedLayout != null) createSpacer(containerBottom, 10);
+            moveComponentToNewParent(image, container);
+        }
         return container;
     }
 
@@ -1079,15 +1139,26 @@ public class Dynamicapp extends AndroidNonvisibleComponent {
         setSingleProp(container, "Width", Integer.valueOf(-2));
         setSingleProp(container, "Height", Integer.valueOf(-2));
         ComponentContainer containerLeft = asContainer(container, "HorizontalArrangement");
-        if (image != null) { moveComponentToNewParent(image, container); createHorizontalSpacer(containerLeft, 15); }
-        AndroidViewComponent textLayout = dynCreate(containerLeft, "VerticalArrangement");
-        setSingleProp(textLayout, "AlignHorizontal", Integer.valueOf(textAlignment == 0 ? 1 : (textAlignment == 2 ? 2 : 1)));
-        setSingleProp(textLayout, "AlignVertical", Integer.valueOf(1));
-        setSingleProp(textLayout, "Width", Integer.valueOf(-2));
-        setSingleProp(textLayout, "Height", Integer.valueOf(-2));
-        ComponentContainer textContainer = asContainer(textLayout, "VerticalArrangement");
-        if (mainLabel != null) { moveComponentToNewParent(mainLabel, textLayout); createSpacer(textContainer, verticalGap); }
-        if (fixedLayout != null) moveComponentToNewParent(fixedLayout, textLayout);
+        
+        if (image != null) { 
+            moveComponentToNewParent(image, container); 
+            if (mainLabel != null || fixedLayout != null) createHorizontalSpacer(containerLeft, 15);
+        }
+        
+        if (mainLabel != null || fixedLayout != null) {
+            AndroidViewComponent textLayout = dynCreate(containerLeft, "VerticalArrangement");
+            setSingleProp(textLayout, "AlignHorizontal", Integer.valueOf(textAlignment == 0 ? 1 : (textAlignment == 2 ? 2 : 1)));
+            setSingleProp(textLayout, "AlignVertical", Integer.valueOf(1));
+            setSingleProp(textLayout, "Width", Integer.valueOf(-2));
+            setSingleProp(textLayout, "Height", Integer.valueOf(-2));
+            ComponentContainer textContainer = asContainer(textLayout, "VerticalArrangement");
+            
+            if (mainLabel != null) { 
+                moveComponentToNewParent(mainLabel, textLayout); 
+                if (fixedLayout != null) createSpacer(textContainer, verticalGap);
+            }
+            if (fixedLayout != null) moveComponentToNewParent(fixedLayout, textLayout);
+        }
         return container;
     }
 
@@ -1098,15 +1169,26 @@ public class Dynamicapp extends AndroidNonvisibleComponent {
         setSingleProp(container, "Width", Integer.valueOf(-2));
         setSingleProp(container, "Height", Integer.valueOf(-2));
         ComponentContainer containerRight = asContainer(container, "HorizontalArrangement");
-        AndroidViewComponent textLayout = dynCreate(containerRight, "VerticalArrangement");
-        setSingleProp(textLayout, "AlignHorizontal", Integer.valueOf(textAlignment == 0 ? 1 : (textAlignment == 2 ? 2 : 1)));
-        setSingleProp(textLayout, "AlignVertical", Integer.valueOf(1));
-        setSingleProp(textLayout, "Width", Integer.valueOf(-2));
-        setSingleProp(textLayout, "Height", Integer.valueOf(-2));
-        ComponentContainer textContainer = asContainer(textLayout, "VerticalArrangement");
-        if (mainLabel != null) { moveComponentToNewParent(mainLabel, textLayout); createSpacer(textContainer, verticalGap); }
-        if (fixedLayout != null) moveComponentToNewParent(fixedLayout, textLayout);
-        if (image != null) { createHorizontalSpacer(containerRight, 15); moveComponentToNewParent(image, container); }
+        
+        if (mainLabel != null || fixedLayout != null) {
+            AndroidViewComponent textLayout = dynCreate(containerRight, "VerticalArrangement");
+            setSingleProp(textLayout, "AlignHorizontal", Integer.valueOf(textAlignment == 0 ? 1 : (textAlignment == 2 ? 2 : 1)));
+            setSingleProp(textLayout, "AlignVertical", Integer.valueOf(1));
+            setSingleProp(textLayout, "Width", Integer.valueOf(-2));
+            setSingleProp(textLayout, "Height", Integer.valueOf(-2));
+            ComponentContainer textContainer = asContainer(textLayout, "VerticalArrangement");
+            
+            if (mainLabel != null) { 
+                moveComponentToNewParent(mainLabel, textLayout); 
+                if (fixedLayout != null) createSpacer(textContainer, verticalGap);
+            }
+            if (fixedLayout != null) moveComponentToNewParent(fixedLayout, textLayout);
+        }
+        
+        if (image != null) {
+            if (mainLabel != null || fixedLayout != null) createHorizontalSpacer(containerRight, 15);
+            moveComponentToNewParent(image, container);
+        }
         return container;
     }
 
