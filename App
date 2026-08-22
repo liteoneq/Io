@@ -1,0 +1,1413 @@
+package com.Adamiq.Dynamicapp;
+
+import android.graphics.Outline;
+import android.os.Build;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
+import com.google.appinventor.components.annotations.DesignerComponent;
+import com.google.appinventor.components.annotations.DesignerProperty;
+import com.google.appinventor.components.annotations.SimpleEvent;
+import com.google.appinventor.components.annotations.SimpleFunction;
+import com.google.appinventor.components.annotations.SimpleObject;
+import com.google.appinventor.components.annotations.SimpleProperty;
+import com.google.appinventor.components.common.ComponentCategory;
+import com.google.appinventor.components.common.PropertyTypeConstants;
+import com.google.appinventor.components.runtime.AndroidNonvisibleComponent;
+import com.google.appinventor.components.runtime.AndroidViewComponent;
+import com.google.appinventor.components.runtime.Component;
+import com.google.appinventor.components.runtime.ComponentContainer;
+import com.google.appinventor.components.runtime.EventDispatcher;
+import com.google.appinventor.components.runtime.errors.YailRuntimeError;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.util.HashMap;
+
+@DesignerComponent(
+    version = 95,
+    versionName = "10.8.0",
+    description = "Dynamic components extension with full Advanced Button visibility and correct Sockets.",
+    category = ComponentCategory.EXTENSION,
+    nonVisible = true,
+    iconName = "",
+    helpUrl = ""
+)
+@SimpleObject(external = true)
+public class Dynamicapp extends AndroidNonvisibleComponent {
+
+    private static final String TAG = "Dynamicapp";
+
+    // Hashmaps for tracking dynamic components
+    private final HashMap<String, AndroidViewComponent> BUTTONS = new HashMap<>();
+    private final HashMap<String, AndroidViewComponent> CARDS = new HashMap<>();
+    private final HashMap<String, AndroidViewComponent> CARD_COLUMNS = new HashMap<>();
+    private final HashMap<String, AndroidViewComponent> CARD_IMAGES = new HashMap<>();
+    private final HashMap<String, HashMap<String, AndroidViewComponent>> CARD_TEXTS = new HashMap<>();
+    private final HashMap<String, HashMap<String, Boolean>> CARD_TEXT_VISIBILITY = new HashMap<>();
+    private final HashMap<String, Integer> CARD_ORIGINAL_COLORS = new HashMap<>();
+    private final HashMap<String, AndroidViewComponent> ADVANCED_BUTTONS = new HashMap<>();
+    private final HashMap<String, AdvancedButtonComponents> ADVANCED_BUTTON_DATA = new HashMap<>();
+
+    // Inner class to hold Advanced Button state
+    private static class AdvancedButtonComponents {
+        AndroidViewComponent card;
+        AndroidViewComponent image;
+        AndroidViewComponent mainText;
+        AndroidViewComponent fixedText1;
+        AndroidViewComponent fixedText2;
+        AndroidViewComponent fixedLayout;
+        AndroidViewComponent container;
+        int originalBackgroundColor = 0xFFFFFFFF;
+        int layoutDirection = 0; // 0=Left, 1=Right, 2=Top, 3=Bottom
+        int textAlignment = 0;   // 0=Left, 1=Center, 2=Right
+        String fixedText1Value = "";
+        String fixedText2Value = "";
+        int fixedText1Size = 12;
+        int fixedText2Size = 12;
+        int fixedText1Color = 0xFF666666;
+        int fixedText2Color = 0xFF666666;
+        boolean fixedText1Bold = false;
+        boolean fixedText2Bold = false;
+        int verticalTextGap = 5;
+        boolean clickFeedbackEnabled = true;
+    }
+
+    // Default Properties Fields
+    private int defaultCardBackgroundColor = 0xFFFFFFFF;
+    private int defaultButtonBackgroundColor = 0xFF2196F3;
+    private int defaultTextColor = 0xFF000000;
+    private boolean defaultCardScrollEnabled = false;
+    private int defaultAdvancedButtonWidth = 250;
+    private int defaultAdvancedButtonHeight = 80;
+    private int defaultAdvancedButtonPadding = 10;
+    private int defaultAdvancedButtonCornerRadius = 12;
+    private int defaultAdvancedButtonBackgroundColor = 0xFFFFFFFF;
+    private int defaultAdvancedButtonMainTextSize = 18;
+    private int defaultAdvancedButtonFixedTextSize = 12;
+    private int defaultAdvancedButtonMainTextColor = 0xFF000000;
+    private int defaultAdvancedButtonFixedTextColor = 0xFF666666;
+    private int defaultAdvancedButtonImageWidth = 50;
+    private int defaultAdvancedButtonImageHeight = 50;
+    private int defaultAdvancedButtonImageCornerRadius = 25;
+    private boolean defaultAdvancedButtonRippleEnabled = true;
+    private int defaultAdvancedButtonClickAnimationDuration = 150;
+    private int defaultVerticalTextGap = 5;
+
+    public Dynamicapp(ComponentContainer container) {
+        super(container.$form());
+    }
+
+    // ============================================================
+    // DESIGNER PROPERTIES
+    // ============================================================
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_COLOR, defaultValue = "&HFFFFFFFF")
+    @SimpleProperty(description = "Default background color for Cards.")
+    public void DefaultCardBackgroundColor(int color) { this.defaultCardBackgroundColor = color; }
+    @SimpleProperty public int DefaultCardBackgroundColor() { return this.defaultCardBackgroundColor; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_BOOLEAN, defaultValue = "False")
+    @SimpleProperty(description = "Enable/disable scrolling for Cards by default.")
+    public void DefaultCardScrollEnabled(boolean enabled) { this.defaultCardScrollEnabled = enabled; }
+    @SimpleProperty public boolean DefaultCardScrollEnabled() { return this.defaultCardScrollEnabled; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_COLOR, defaultValue = "&HFF2196F3")
+    @SimpleProperty(description = "Default background color for Buttons.")
+    public void DefaultButtonBackgroundColor(int color) { this.defaultButtonBackgroundColor = color; }
+    @SimpleProperty public int DefaultButtonBackgroundColor() { return this.defaultButtonBackgroundColor; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_COLOR, defaultValue = "&HFF000000")
+    @SimpleProperty(description = "Default text color.")
+    public void DefaultTextColor(int color) { this.defaultTextColor = color; }
+    @SimpleProperty public int DefaultTextColor() { return this.defaultTextColor; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_NON_NEGATIVE_INTEGER, defaultValue = "250")
+    @SimpleProperty(description = "Default width for advanced buttons in DP.")
+    public void DefaultAdvancedButtonWidth(int width) { this.defaultAdvancedButtonWidth = width; }
+    @SimpleProperty public int DefaultAdvancedButtonWidth() { return this.defaultAdvancedButtonWidth; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_NON_NEGATIVE_INTEGER, defaultValue = "80")
+    @SimpleProperty(description = "Default height for advanced buttons in DP.")
+    public void DefaultAdvancedButtonHeight(int height) { this.defaultAdvancedButtonHeight = height; }
+    @SimpleProperty public int DefaultAdvancedButtonHeight() { return this.defaultAdvancedButtonHeight; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_NON_NEGATIVE_INTEGER, defaultValue = "10")
+    @SimpleProperty(description = "Default padding for advanced buttons in DP.")
+    public void DefaultAdvancedButtonPadding(int padding) { this.defaultAdvancedButtonPadding = padding; }
+    @SimpleProperty public int DefaultAdvancedButtonPadding() { return this.defaultAdvancedButtonPadding; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_NON_NEGATIVE_INTEGER, defaultValue = "12")
+    @SimpleProperty(description = "Default corner radius for advanced buttons in DP.")
+    public void DefaultAdvancedButtonCornerRadius(int radius) { this.defaultAdvancedButtonCornerRadius = radius; }
+    @SimpleProperty public int DefaultAdvancedButtonCornerRadius() { return this.defaultAdvancedButtonCornerRadius; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_COLOR, defaultValue = "&HFFFFFFFF")
+    @SimpleProperty(description = "Default background color for advanced buttons.")
+    public void DefaultAdvancedButtonBackgroundColor(int color) { this.defaultAdvancedButtonBackgroundColor = color; }
+    @SimpleProperty public int DefaultAdvancedButtonBackgroundColor() { return this.defaultAdvancedButtonBackgroundColor; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_COLOR, defaultValue = "&HFF000000")
+    @SimpleProperty(description = "Default main text color for advanced buttons.")
+    public void DefaultAdvancedButtonMainTextColor(int color) { this.defaultAdvancedButtonMainTextColor = color; }
+    @SimpleProperty public int DefaultAdvancedButtonMainTextColor() { return this.defaultAdvancedButtonMainTextColor; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_COLOR, defaultValue = "&HFF666666")
+    @SimpleProperty(description = "Default fixed text color for advanced buttons.")
+    public void DefaultAdvancedButtonFixedTextColor(int color) { this.defaultAdvancedButtonFixedTextColor = color; }
+    @SimpleProperty public int DefaultAdvancedButtonFixedTextColor() { return this.defaultAdvancedButtonFixedTextColor; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_NON_NEGATIVE_INTEGER, defaultValue = "18")
+    @SimpleProperty(description = "Default main text size.")
+    public void DefaultAdvancedButtonMainTextSize(int size) { this.defaultAdvancedButtonMainTextSize = size; }
+    @SimpleProperty public int DefaultAdvancedButtonMainTextSize() { return this.defaultAdvancedButtonMainTextSize; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_NON_NEGATIVE_INTEGER, defaultValue = "12")
+    @SimpleProperty(description = "Default fixed text size.")
+    public void DefaultAdvancedButtonFixedTextSize(int size) { this.defaultAdvancedButtonFixedTextSize = size; }
+    @SimpleProperty public int DefaultAdvancedButtonFixedTextSize() { return this.defaultAdvancedButtonFixedTextSize; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_NON_NEGATIVE_INTEGER, defaultValue = "50")
+    @SimpleProperty(description = "Default image width (DP).")
+    public void DefaultAdvancedButtonImageWidth(int width) { this.defaultAdvancedButtonImageWidth = width; }
+    @SimpleProperty public int DefaultAdvancedButtonImageWidth() { return this.defaultAdvancedButtonImageWidth; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_NON_NEGATIVE_INTEGER, defaultValue = "50")
+    @SimpleProperty(description = "Default image height (DP).")
+    public void DefaultAdvancedButtonImageHeight(int height) { this.defaultAdvancedButtonImageHeight = height; }
+    @SimpleProperty public int DefaultAdvancedButtonImageHeight() { return this.defaultAdvancedButtonImageHeight; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_NON_NEGATIVE_INTEGER, defaultValue = "25")
+    @SimpleProperty(description = "Default image corner radius (DP).")
+    public void DefaultAdvancedButtonImageCornerRadius(int radius) { this.defaultAdvancedButtonImageCornerRadius = radius; }
+    @SimpleProperty public int DefaultAdvancedButtonImageCornerRadius() { return this.defaultAdvancedButtonImageCornerRadius; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_BOOLEAN, defaultValue = "True")
+    @SimpleProperty(description = "Enable ripple/click feedback globally.")
+    public void DefaultAdvancedButtonRippleEnabled(boolean enabled) { this.defaultAdvancedButtonRippleEnabled = enabled; }
+    @SimpleProperty public boolean DefaultAdvancedButtonRippleEnabled() { return this.defaultAdvancedButtonRippleEnabled; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_NON_NEGATIVE_INTEGER, defaultValue = "150")
+    @SimpleProperty(description = "Click animation duration (ms).")
+    public void DefaultAdvancedButtonClickAnimationDuration(int duration) { this.defaultAdvancedButtonClickAnimationDuration = duration; }
+    @SimpleProperty public int DefaultAdvancedButtonClickAnimationDuration() { return this.defaultAdvancedButtonClickAnimationDuration; }
+
+    @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_NON_NEGATIVE_INTEGER, defaultValue = "5")
+    @SimpleProperty(description = "Default vertical gap (DP).")
+    public void DefaultVerticalTextGap(int gap) { this.defaultVerticalTextGap = gap; }
+    @SimpleProperty public int DefaultVerticalTextGap() { return this.defaultVerticalTextGap; }
+
+    // ============================================================
+    // TEXT KEY FUNCTIONS
+    // ============================================================
+    @SimpleFunction(description = "Returns the 'title' text key for Cards.")
+    public String TextKeyTitle() { return "title"; }
+
+    @SimpleFunction(description = "Returns the 'card' text key for Cards.")
+    public String TextKeyCard() { return "card"; }
+
+    @SimpleFunction(description = "Returns the 'updated' text key for Cards.")
+    public String TextKeyUpdated() { return "updated"; }
+
+    @SimpleFunction(description = "Returns the 'platform' text key for Cards.")
+    public String TextKeyPlatform() { return "platform"; }
+
+    @SimpleFunction(description = "Returns the 'developer' text key for Cards.")
+    public String TextKeyDeveloper() { return "developer"; }
+
+    @SimpleFunction(description = "Returns the 'downloads' text key for Cards.")
+    public String TextKeyDownloads() { return "downloads"; }
+
+    @SimpleFunction(description = "Returns the 'number' text key for Cards.")
+    public String TextKeyNumber() { return "number"; }
+
+    // ============================================================
+    // DYNAMIC BUTTONS
+    // ============================================================
+    @SimpleFunction(description = "Creates a dynamic Button inside an Arrangement.")
+    public void CreateButton(String id, Component arrangement) {
+        validateId(id);
+        if (arrangement == null) throw new YailRuntimeError("Arrangement cannot be null", TAG);
+        ComponentContainer parent = asContainer(arrangement, "Arrangement");
+        DeleteButton(id);
+        try {
+            AndroidViewComponent button = dynCreate(parent, "Button");
+            setSingleProp(button, "BackgroundColor", Integer.valueOf(this.defaultButtonBackgroundColor));
+            this.BUTTONS.put(id, button);
+            makeButtonClickable(button, id);
+        } catch (Exception e) {
+            throw new YailRuntimeError("CreateButton failed: " + safeMessage(e), TAG);
+        }
+    }
+
+    @SimpleFunction(description = "Deletes a dynamic Button.")
+    public void DeleteButton(String id) {
+        if (id == null) return;
+        AndroidViewComponent button = this.BUTTONS.remove(id);
+        if (button != null) removeComponentFromParent(button);
+    }
+
+    @SimpleFunction(description = "Sets the text of a dynamic Button.")
+    public void SetButtonText(String id, String text) {
+        validateId(id);
+        AndroidViewComponent button = this.BUTTONS.get(id);
+        if (button != null) setSingleProp(button, "Text", text == null ? "" : text);
+    }
+
+    @SimpleFunction(description = "Configures all text parameters for a dynamic Button.")
+    public void ConfigureButtonText(String id, String text, int fontSize, boolean isBold, int textColor) {
+        validateId(id);
+        AndroidViewComponent button = this.BUTTONS.get(id);
+        if (button != null) {
+            setSingleProp(button, "Text", text == null ? "" : text);
+            setSingleProp(button, "FontSize", Integer.valueOf(fontSize));
+            setSingleProp(button, "FontBold", Boolean.valueOf(isBold));
+            setSingleProp(button, "TextColor", Integer.valueOf(textColor));
+        }
+    }
+
+    @SimpleFunction(description = "Sets the image of a dynamic Button.")
+    public void SetButtonImage(String id, String imagePath) {
+        validateId(id);
+        AndroidViewComponent button = this.BUTTONS.get(id);
+        if (button != null) setSingleProp(button, "Image", imagePath == null ? "" : imagePath);
+    }
+
+    @SimpleFunction(description = "Sets the font size of a dynamic Button.")
+    public void SetButtonFontSize(String id, int fontSize) {
+        validateId(id);
+        AndroidViewComponent button = this.BUTTONS.get(id);
+        if (button != null) setSingleProp(button, "FontSize", Integer.valueOf(fontSize));
+    }
+
+    @SimpleFunction(description = "Sets whether the text is bold.")
+    public void SetButtonFontBold(String id, boolean isBold) {
+        validateId(id);
+        AndroidViewComponent button = this.BUTTONS.get(id);
+        if (button != null) setSingleProp(button, "FontBold", Boolean.valueOf(isBold));
+    }
+
+    @SimpleFunction(description = "Sets the text color.")
+    public void SetButtonTextColor(String id, int textColor) {
+        validateId(id);
+        AndroidViewComponent button = this.BUTTONS.get(id);
+        if (button != null) setSingleProp(button, "TextColor", Integer.valueOf(textColor));
+    }
+
+    @SimpleFunction(description = "Sets the background color.")
+    public void SetButtonBackgroundColor(String id, int backgroundColor) {
+        validateId(id);
+        AndroidViewComponent button = this.BUTTONS.get(id);
+        if (button != null) setSingleProp(button, "BackgroundColor", Integer.valueOf(backgroundColor));
+    }
+
+    @SimpleFunction(description = "Sets the width.")
+    public void SetButtonWidth(String id, int width) {
+        validateId(id);
+        AndroidViewComponent button = this.BUTTONS.get(id);
+        if (button != null) setSingleProp(button, "Width", Integer.valueOf(width));
+    }
+
+    @SimpleFunction(description = "Sets the height.")
+    public void SetButtonHeight(String id, int height) {
+        validateId(id);
+        AndroidViewComponent button = this.BUTTONS.get(id);
+        if (button != null) setSingleProp(button, "Height", Integer.valueOf(height));
+    }
+
+    @SimpleFunction(description = "Sets the corner radius.")
+    public void SetButtonCornerRadius(String id, float radius) {
+        validateId(id);
+        AndroidViewComponent button = this.BUTTONS.get(id);
+        if (button != null) {
+            try {
+                View view = getAndroidView(button);
+                if (view != null) {
+                    android.graphics.drawable.GradientDrawable drawable = new android.graphics.drawable.GradientDrawable();
+                    drawable.setCornerRadius(dpToPx((int) radius, this.form.deviceDensity()));
+                    view.setBackground(drawable);
+                }
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+    }
+
+    @SimpleFunction(description = "Shows or hides a dynamic Button.")
+    public void SetVisibleButton(String id, boolean visible) {
+        validateId(id);
+        AndroidViewComponent button = this.BUTTONS.get(id);
+        if (button != null) setComponentVisible(button, visible);
+    }
+
+    // ============================================================
+    // ADVANCED BUTTONS
+    // ============================================================
+    @SimpleFunction(description = "Creates an advanced button with image, main text and two fixed texts.")
+    public void CreateAdvancedButton(String id, Component arrangement, String imagePath, String mainText, String fixedText1, String fixedText2) {
+        validateId(id);
+        if (arrangement == null) throw new YailRuntimeError("Arrangement cannot be null.", TAG);
+        try {
+            ComponentContainer parent = asContainer(arrangement, "Arrangement");
+            DeleteAdvancedButton(id);
+            AndroidViewComponent card = dynCreate(parent, "MakeroidCardView");
+            setSingleProp(card, "Width", Integer.valueOf(this.defaultAdvancedButtonWidth));
+            setSingleProp(card, "Height", Integer.valueOf(this.defaultAdvancedButtonHeight));
+            setSingleProp(card, "BackgroundColor", Integer.valueOf(this.defaultAdvancedButtonBackgroundColor));
+            setSingleProp(card, "CornerRadius", Integer.valueOf(this.defaultAdvancedButtonCornerRadius));
+            setSingleProp(card, "ContentPaddingLeft", Integer.valueOf(this.defaultAdvancedButtonPadding));
+            setSingleProp(card, "ContentPaddingRight", Integer.valueOf(this.defaultAdvancedButtonPadding));
+            setSingleProp(card, "ContentPaddingTop", Integer.valueOf(this.defaultAdvancedButtonPadding));
+            setSingleProp(card, "ContentPaddingBottom", Integer.valueOf(this.defaultAdvancedButtonPadding));
+            
+            AdvancedButtonComponents components = new AdvancedButtonComponents();
+            components.card = card;
+            components.originalBackgroundColor = this.defaultAdvancedButtonBackgroundColor;
+            this.ADVANCED_BUTTONS.put(id, card);
+            this.ADVANCED_BUTTON_DATA.put(id, components);
+            
+            if (mainText != null && !mainText.isEmpty()) {
+                SetupAdvancedButtonMainText(id, mainText, this.defaultAdvancedButtonMainTextSize, this.defaultAdvancedButtonMainTextColor, 0, true);
+            }
+            if (fixedText1 != null || fixedText2 != null) {
+                SetupAdvancedButtonFixedTexts(id, fixedText1, fixedText2, this.defaultAdvancedButtonFixedTextSize, this.defaultAdvancedButtonFixedTextColor, false, this.defaultAdvancedButtonFixedTextSize, this.defaultAdvancedButtonFixedTextColor, false);
+            }
+            if (imagePath != null && !imagePath.isEmpty()) {
+                SetupAdvancedButtonImage(id, imagePath, this.defaultAdvancedButtonImageWidth, this.defaultAdvancedButtonImageHeight, this.defaultAdvancedButtonImageCornerRadius);
+            } else {
+                AssembleAdvancedButtonLayout(id, 0);
+            }
+            makeAdvancedButtonClickable(id);
+        } catch (Exception e) {
+            throw new YailRuntimeError("CreateAdvancedButton failed: " + safeMessage(e), TAG);
+        }
+    }
+
+    @SimpleFunction(description = "Deletes an advanced button.")
+    public void DeleteAdvancedButton(String id) {
+        if (id == null) return;
+        AndroidViewComponent button = this.ADVANCED_BUTTONS.remove(id);
+        this.ADVANCED_BUTTON_DATA.remove(id);
+        if (button != null) removeComponentFromParent(button);
+    }
+
+    @SimpleFunction(description = "Configures and attaches an Image to an Advanced Button.")
+    public void SetupAdvancedButtonImage(String id, String imagePath, int imageWidth, int imageHeight, int imageCornerRadius) {
+        validateId(id);
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components != null && components.card != null) {
+            try {
+                ComponentContainer cardContainer = asContainer(components.card, "MakeroidCardView");
+                if (components.image != null) removeComponentFromParent(components.image);
+                if (imagePath != null && !imagePath.isEmpty()) {
+                    AndroidViewComponent image = dynCreate(cardContainer, "Image");
+                    setSingleProp(image, "Picture", imagePath);
+                    setSingleProp(image, "Width", Integer.valueOf(imageWidth));
+                    setSingleProp(image, "Height", Integer.valueOf(-2));
+                    if (imageCornerRadius > 0) applyImageShape(image, imageWidth == imageHeight, imageCornerRadius);
+                    components.image = image;
+                    AssembleAdvancedButtonLayout(id, components.layoutDirection);
+                }
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+    }
+
+    @SimpleFunction(description = "Configures the Main Text with Bold support.")
+    public void SetupAdvancedButtonMainText(String id, String mainText, int mainFontSize, int mainColor, int alignment, boolean isBold) {
+        validateId(id);
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components != null && components.card != null) {
+            try {
+                ComponentContainer cardContainer = asContainer(components.card, "MakeroidCardView");
+                if (components.mainText != null) removeComponentFromParent(components.mainText);
+                AndroidViewComponent mainLabel = dynLabel(cardContainer, mainFontSize, isBold, mainColor, mainText == null ? "" : mainText);
+                setSingleProp(mainLabel, "TextAlignment", Integer.valueOf(alignment));
+                components.mainText = mainLabel;
+                components.textAlignment = alignment;
+                makeLabelClickable(mainLabel, id, "main", mainText == null ? "" : mainText);
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+    }
+
+    @SimpleFunction(description = "Configures Fixed Sub-Texts with Bold support. Gap is fixed at 20px.")
+    public void SetupAdvancedButtonFixedTexts(String id, String fixedText1, String fixedText2, int fixedFontSize1, int fixedColor1, boolean isBold1, int fixedFontSize2, int fixedColor2, boolean isBold2) {
+        validateId(id);
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components != null && components.card != null) {
+            try {
+                ComponentContainer cardContainer = asContainer(components.card, "MakeroidCardView");
+                if (components.fixedLayout != null) removeComponentFromParent(components.fixedLayout);
+                
+                AndroidViewComponent fixedLayout = dynCreate(cardContainer, "HorizontalArrangement");
+                setSingleProp(fixedLayout, "AlignHorizontal", Integer.valueOf(1));
+                setSingleProp(fixedLayout, "AlignVertical", Integer.valueOf(1));
+                setSingleProp(fixedLayout, "Width", Integer.valueOf(-2));
+                setSingleProp(fixedLayout, "Height", Integer.valueOf(-2));
+                setSingleProp(fixedLayout, "ContentPaddingLeft", Integer.valueOf(10));
+                setSingleProp(fixedLayout, "ContentPaddingRight", Integer.valueOf(10));
+                components.fixedLayout = fixedLayout;
+                
+                ComponentContainer fixedContainer = asContainer(fixedLayout, "HorizontalArrangement");
+                if (fixedText1 != null && !fixedText1.isEmpty()) {
+                    AndroidViewComponent fixedLabel1 = dynLabel(fixedContainer, fixedFontSize1, isBold1, fixedColor1, fixedText1);
+                    components.fixedText1 = fixedLabel1;
+                    components.fixedText1Value = fixedText1;
+                    components.fixedText1Size = fixedFontSize1;
+                    components.fixedText1Color = fixedColor1;
+                    components.fixedText1Bold = isBold1;
+                    makeLabelClickable(fixedLabel1, id, "fixed1", fixedText1);
+                }
+                if (fixedText2 != null && !fixedText2.isEmpty()) {
+                    AndroidViewComponent fixedLabel2 = dynLabel(fixedContainer, fixedFontSize2, isBold2, fixedColor2, fixedText2);
+                    components.fixedText2 = fixedLabel2;
+                    components.fixedText2Value = fixedText2;
+                    components.fixedText2Size = fixedFontSize2;
+                    components.fixedText2Color = fixedColor2;
+                    components.fixedText2Bold = isBold2;
+                    makeLabelClickable(fixedLabel2, id, "fixed2", fixedText2);
+                }
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+    }
+
+    @SimpleFunction(description = "Assembles the layout based on current direction.")
+    public void AssembleAdvancedButtonLayout(String id, int direction) {
+        validateId(id);
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components != null && components.card != null) {
+            try {
+                ComponentContainer cardContainer = asContainer(components.card, "MakeroidCardView");
+                if (components.container != null) removeComponentFromParent(components.container);
+                AndroidViewComponent container = createLayout(cardContainer, components.image, components.mainText, components.fixedLayout, direction, components.verticalTextGap, components.textAlignment);
+                components.container = container;
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+    }
+
+    @SimpleFunction(description = "Sets the layout direction of elements. 0=Left, 1=Right, 2=Top, 3=Bottom.")
+    public void SetAdvancedButtonLayoutDirection(String id, int direction) {
+        validateId(id);
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components != null) {
+            components.layoutDirection = Math.max(0, Math.min(3, direction));
+            AssembleAdvancedButtonLayout(id, components.layoutDirection);
+        }
+    }
+
+    @SimpleFunction(description = "Sets the text alignment only (0=Left, 1=Center, 2=Right). Does not affect image position.")
+    public void SetAdvancedButtonTextAlignment(String id, int alignment) {
+        validateId(id);
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components != null) {
+            components.textAlignment = Math.max(0, Math.min(2, alignment));
+            if (components.mainText != null) {
+                setSingleProp(components.mainText, "TextAlignment", Integer.valueOf(components.textAlignment));
+            }
+            if (components.fixedLayout != null) {
+                setSingleProp(components.fixedLayout, "AlignHorizontal", Integer.valueOf(components.textAlignment == 0 ? 1 : (components.textAlignment == 2 ? 2 : 1)));
+            }
+        }
+    }
+
+    @SimpleFunction(description = "Sets the click behavior for the advanced button. 1=Full Surface, 2=Texts Only, 3=Mixed.")
+    public void SetAdvancedButtonClickMode(String id, int mode) {
+        validateId(id);
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components != null && components.card != null) {
+            try {
+                View rootView = getAndroidView(components.card);
+                if (rootView == null) return;
+                if (mode == 1) {
+                    rootView.setClickable(true); rootView.setFocusable(true);
+                    if (this.defaultAdvancedButtonRippleEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        android.util.TypedValue outValue = new android.util.TypedValue();
+                        this.form.$context().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+                        rootView.setForeground(this.form.$context().getDrawable(outValue.resourceId));
+                    }
+                    rootView.setOnClickListener(new View.OnClickListener() { 
+                        @Override public void onClick(View v) { animateButtonClick(id); AdvancedButtonClick(id); } 
+                    });
+                    disableClickRecursively(rootView);
+                } else if (mode == 2) {
+                    rootView.setClickable(false); rootView.setFocusable(false); rootView.setOnClickListener(null);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) rootView.setForeground(null);
+                    enableClickRecursively(rootView, new View.OnClickListener() { @Override public void onClick(View v) {} });
+                } else {
+                    rootView.setClickable(true); rootView.setFocusable(true);
+                    if (this.defaultAdvancedButtonRippleEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        android.util.TypedValue outValue = new android.util.TypedValue();
+                        this.form.$context().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+                        rootView.setForeground(this.form.$context().getDrawable(outValue.resourceId));
+                    }
+                    rootView.setOnClickListener(new View.OnClickListener() { 
+                        @Override public void onClick(View v) { animateButtonClick(id); AdvancedButtonClick(id); } 
+                    });
+                    enableClickRecursively(rootView, new View.OnClickListener() { @Override public void onClick(View v) {} });
+                }
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+    }
+
+    @SimpleFunction(description = "Sets the background color of the advanced button.")
+    public void SetAdvancedButtonBackgroundColor(String id, int color) {
+        validateId(id);
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components != null && components.card != null) {
+            setSingleProp(components.card, "BackgroundColor", Integer.valueOf(color));
+            components.originalBackgroundColor = color;
+        }
+    }
+
+    @SimpleFunction(description = "Sets the corner radius of the advanced button.")
+    public void SetAdvancedButtonCornerRadius(String id, int radius) {
+        validateId(id);
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components != null && components.card != null) setSingleProp(components.card, "CornerRadius", Integer.valueOf(radius));
+    }
+
+    @SimpleFunction(description = "Sets the padding of the advanced button in DP.")
+    public void SetAdvancedButtonPadding(String id, int paddingDp) {
+        validateId(id);
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components != null && components.card != null) {
+            setSingleProp(components.card, "ContentPaddingLeft", Integer.valueOf(paddingDp));
+            setSingleProp(components.card, "ContentPaddingRight", Integer.valueOf(paddingDp));
+            setSingleProp(components.card, "ContentPaddingTop", Integer.valueOf(paddingDp));
+            setSingleProp(components.card, "ContentPaddingBottom", Integer.valueOf(paddingDp));
+        }
+    }
+
+    @SimpleFunction(description = "Sets the width of the advanced button in DP.")
+    public void SetAdvancedButtonWidth(String id, int width) {
+        validateId(id);
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components != null && components.card != null) setSingleProp(components.card, "Width", Integer.valueOf(width));
+    }
+
+    @SimpleFunction(description = "Sets the height of the advanced button in DP.")
+    public void SetAdvancedButtonHeight(String id, int height) {
+        validateId(id);
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components != null && components.card != null) setSingleProp(components.card, "Height", Integer.valueOf(height));
+    }
+
+    @SimpleFunction(description = "Shows or hides an advanced button.")
+    public void SetVisibleAdvancedButton(String id, boolean visible) {
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components != null && components.card != null) setComponentVisible(components.card, visible);
+    }
+
+    @SimpleFunction(description = "Enables click animation feedback.")
+    public void SetAdvancedButtonClickFeedback(String id, boolean enabled) {
+        validateId(id);
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components != null) components.clickFeedbackEnabled = enabled;
+    }
+
+    // ============================================================
+    // EVENTS
+    // ============================================================
+    @SimpleEvent(description = "Occurs when an advanced button is clicked.")
+    public void AdvancedButtonClick(String id) { EventDispatcher.dispatchEvent(this, "AdvancedButtonClick", id); }
+    
+    @SimpleEvent(description = "Occurs when Main Text is clicked.")
+    public void AdvancedButtonMainTextClick(String id, String text) { EventDispatcher.dispatchEvent(this, "AdvancedButtonMainTextClick", id, text); }
+    
+    @SimpleEvent(description = "Occurs when Fixed Text 1 is clicked.")
+    public void AdvancedButtonFixedText1Click(String id, String text) { EventDispatcher.dispatchEvent(this, "AdvancedButtonFixedText1Click", id, text); }
+    
+    @SimpleEvent(description = "Occurs when Fixed Text 2 is clicked.")
+    public void AdvancedButtonFixedText2Click(String id, String text) { EventDispatcher.dispatchEvent(this, "AdvancedButtonFixedText2Click", id, text); }
+    
+    @SimpleEvent(description = "Occurs when a dynamic button is clicked.")
+    public void ButtonClick(String id) { EventDispatcher.dispatchEvent(this, "ButtonClick", id); }
+    
+    @SimpleEvent(description = "Occurs when a Card is clicked.")
+    public void CardClick(String id) { EventDispatcher.dispatchEvent(this, "CardClick", id); }
+    
+    @SimpleEvent(description = "Occurs when a specific text inside a card is clicked.")
+    public void CardTextClick(String id, String textKey, String textValue) { EventDispatcher.dispatchEvent(this, "CardTextClick", id, textKey, textValue); }
+
+    // ============================================================
+    // CARDS
+    // ============================================================
+    @SimpleFunction(description = "Creates a dynamic Card.")
+    public void CreateCard(String id, Component arrangement) {
+        validateId(id);
+        if (arrangement == null) throw new YailRuntimeError("Arrangement cannot be null", TAG);
+        ComponentContainer parent = asContainer(arrangement, "Arrangement");
+        try {
+            DeleteCard(id);
+            HashMap<String, AndroidViewComponent> labelsMap = new HashMap<>();
+            HashMap<String, Boolean> visibilityMap = new HashMap<>();
+            AndroidViewComponent cardView = createBaseCardView(parent, id, labelsMap, visibilityMap);
+            this.CARDS.put(id, cardView);
+            this.CARD_TEXTS.put(id, labelsMap);
+            this.CARD_TEXT_VISIBILITY.put(id, visibilityMap);
+            this.CARD_ORIGINAL_COLORS.put(id, Integer.valueOf(this.defaultCardBackgroundColor));
+            SetCardClickMode(id, 1);
+        } catch (Exception e) {
+            throw new YailRuntimeError("CreateCard failed: " + safeMessage(e), TAG);
+        }
+    }
+
+    @SimpleFunction(description = "Deletes a dynamic Card.")
+    public void DeleteCard(String id) {
+        if (id == null) return;
+        AndroidViewComponent card = this.CARDS.remove(id);
+        this.CARD_TEXTS.remove(id); this.CARD_COLUMNS.remove(id); this.CARD_IMAGES.remove(id);
+        this.CARD_TEXT_VISIBILITY.remove(id); this.CARD_ORIGINAL_COLORS.remove(id);
+        if (card != null) removeComponentFromParent(card);
+    }
+
+    @SimpleFunction(description = "Adds a custom text item to a Card. Type any name you want in customKey (e.g., price, date).")
+    public void AddCustomCardText(String id, String customKey, String textValue, int fontSize, boolean isBold, int textColor, int alignment) {
+        validateId(id);
+        HashMap<String, AndroidViewComponent> labels = this.CARD_TEXTS.get(id);
+        HashMap<String, Boolean> visibilityMap = this.CARD_TEXT_VISIBILITY.get(id);
+        AndroidViewComponent column = this.CARD_COLUMNS.get(id);
+        if (labels != null && column != null) {
+            try {
+                ComponentContainer columnContainer = asContainer(column, "VerticalArrangement");
+                AndroidViewComponent label = dynLabel(columnContainer, fontSize, isBold, textColor, textValue == null ? "" : textValue);
+                setSingleProp(label, "TextAlignment", Integer.valueOf(alignment));
+                labels.put(customKey, label);
+                if (visibilityMap != null) visibilityMap.put(customKey, Boolean.TRUE);
+                makeLabelClickable(label, id, customKey, textValue == null ? "" : textValue);
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+    }
+
+    @SimpleFunction(description = "Deletes a specific text inside a card.")
+    public void DeleteTextCardView(String id, String textKey) {
+        validateId(id);
+        HashMap<String, AndroidViewComponent> labels = this.CARD_TEXTS.get(id);
+        HashMap<String, Boolean> visibilityMap = this.CARD_TEXT_VISIBILITY.get(id);
+        if (labels != null && labels.containsKey(textKey)) {
+            AndroidViewComponent label = labels.remove(textKey);
+            if (visibilityMap != null) visibilityMap.remove(textKey);
+            if (label != null) removeComponentFromParent(label);
+        }
+    }
+
+    @SimpleFunction(description = "Sets the image path for a Card.")
+    public void SetCardImage(String id, String imagePath) {
+        validateId(id);
+        AndroidViewComponent imageComp = this.CARD_IMAGES.get(id);
+        if (imageComp != null) setSingleProp(imageComp, "Picture", imagePath == null ? "" : imagePath);
+    }
+
+    @SimpleFunction(description = "Sets the size for the Card image.")
+    public void SetCardImageSize(String id, int widthDp, int heightDp) {
+        validateId(id);
+        AndroidViewComponent imageComp = this.CARD_IMAGES.get(id);
+        if (imageComp != null) { setSingleProp(imageComp, "Width", Integer.valueOf(widthDp)); setSingleProp(imageComp, "Height", Integer.valueOf(heightDp)); }
+    }
+
+    @SimpleFunction(description = "Controls the shape of the Card image.")
+    public void SetCardImageShape(String id, boolean isCircle, float cornerRadiusDp) {
+        validateId(id);
+        AndroidViewComponent imageComp = this.CARD_IMAGES.get(id);
+        if (imageComp != null) applyImageShape(imageComp, isCircle, cornerRadiusDp);
+    }
+
+    @SimpleFunction(description = "Sets the width of a Card.")
+    public void SetCardWidth(String id, int width) {
+        validateId(id);
+        AndroidViewComponent card = this.CARDS.get(id);
+        if (card != null) setSingleProp(card, "Width", Integer.valueOf(width));
+    }
+
+    @SimpleFunction(description = "Sets the height of a Card.")
+    public void SetCardHeight(String id, int height) {
+        validateId(id);
+        AndroidViewComponent card = this.CARDS.get(id);
+        if (card != null) setSingleProp(card, "Height", Integer.valueOf(height));
+    }
+
+    @SimpleFunction(description = "Sets the background color of a Card.")
+    public void SetCardBackgroundColor(String id, int backgroundColor) {
+        validateId(id);
+        AndroidViewComponent card = this.CARDS.get(id);
+        if (card != null) { setSingleProp(card, "BackgroundColor", Integer.valueOf(backgroundColor)); this.CARD_ORIGINAL_COLORS.put(id, Integer.valueOf(backgroundColor)); }
+    }
+
+    @SimpleFunction(description = "Sets the corner radius of a Card.")
+    public void SetCardCornerRadius(String id, int radius) {
+        validateId(id);
+        AndroidViewComponent card = this.CARDS.get(id);
+        if (card != null) setSingleProp(card, "CornerRadius", Integer.valueOf(radius));
+    }
+
+    @SimpleFunction(description = "Sets the layout orientation.")
+    public void SetCardOrientation(String id, boolean isHorizontal) {
+        validateId(id);
+        AndroidViewComponent currentContainer = this.CARD_COLUMNS.get(id);
+        AndroidViewComponent card = this.CARDS.get(id);
+        HashMap<String, AndroidViewComponent> labels = this.CARD_TEXTS.get(id);
+        AndroidViewComponent imageComp = this.CARD_IMAGES.get(id);
+        if (card != null && currentContainer != null && labels != null) {
+            try {
+                ComponentContainer cardContainer = asContainer(card, "MakeroidCardView");
+                String targetType = isHorizontal ? "HorizontalArrangement" : "VerticalArrangement";
+                AndroidViewComponent newContainer = dynCreate(cardContainer, targetType);
+                setSingleProp(newContainer, "AlignHorizontal", Integer.valueOf(1));
+                setSingleProp(newContainer, "AlignVertical", Integer.valueOf(1));
+                setSingleProp(newContainer, "Width", Integer.valueOf(-2));
+                setSingleProp(newContainer, "Height", Integer.valueOf(-2));
+                if (imageComp != null) moveComponentToNewParent(imageComp, newContainer);
+                for (AndroidViewComponent label : labels.values()) { if (label != null) moveComponentToNewParent(label, newContainer); }
+                removeComponentFromParent(currentContainer);
+                this.CARD_COLUMNS.put(id, newContainer);
+            } catch (Exception e) { throw new YailRuntimeError("SetCardOrientation failed: " + safeMessage(e), TAG); }
+        }
+    }
+
+    @SimpleFunction(description = "Enables or disables scrolling for a Card.")
+    public void SetCardScrollEnabled(String id, boolean enabled) {
+        validateId(id);
+        AndroidViewComponent card = this.CARDS.get(id);
+        if (card != null) {
+            try {
+                View cardView = getAndroidView(card);
+                if (cardView instanceof ViewGroup) {
+                    ViewGroup cardGroup = (ViewGroup) cardView;
+                    if (enabled) {
+                        if (cardGroup.getChildCount() > 0 && cardGroup.getChildAt(0) instanceof android.widget.ScrollView) return;
+                        android.widget.ScrollView scrollView = new android.widget.ScrollView(this.form);
+                        scrollView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                        scrollView.setFillViewport(true);
+                        if (cardGroup.getChildCount() > 0) {
+                            View content = cardGroup.getChildAt(0);
+                            cardGroup.removeView(content);
+                            scrollView.addView(content);
+                        }
+                        cardGroup.addView(scrollView);
+                    } else {
+                        if (cardGroup.getChildCount() > 0 && cardGroup.getChildAt(0) instanceof android.widget.ScrollView) {
+                            android.widget.ScrollView sv = (android.widget.ScrollView) cardGroup.getChildAt(0);
+                            if (sv.getChildCount() > 0) {
+                                View orig = sv.getChildAt(0);
+                                cardGroup.removeView(sv);
+                                cardGroup.addView(orig);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+    }
+
+    @SimpleFunction(description = "Shows or hides a specific text item in a Card.")
+    public void SetCardTextVisible(String id, String textKey, boolean visible) {
+        validateId(id);
+        HashMap<String, AndroidViewComponent> labels = this.CARD_TEXTS.get(id);
+        HashMap<String, Boolean> visibilityMap = this.CARD_TEXT_VISIBILITY.get(id);
+        if (labels != null && labels.containsKey(textKey)) {
+            AndroidViewComponent label = labels.get(textKey);
+            if (label != null) { setComponentVisible(label, visible); if (visibilityMap != null) visibilityMap.put(textKey, Boolean.valueOf(visible)); }
+        }
+    }
+
+    @SimpleFunction(description = "Checks if a text item is visible.")
+    public boolean IsCardTextVisible(String id, String textKey) {
+        validateId(id);
+        HashMap<String, Boolean> visibilityMap = this.CARD_TEXT_VISIBILITY.get(id);
+        if (visibilityMap != null && visibilityMap.containsKey(textKey)) {
+            Boolean result = visibilityMap.get(textKey);
+            return result != null && result.booleanValue();
+        }
+        return true;
+    }
+
+    @SimpleFunction(description = "Hides all text items in a Card.")
+    public void HideAllCardTexts(String id) {
+        validateId(id);
+        HashMap<String, AndroidViewComponent> labels = this.CARD_TEXTS.get(id);
+        HashMap<String, Boolean> visibilityMap = this.CARD_TEXT_VISIBILITY.get(id);
+        if (labels != null) {
+            for (HashMap.Entry<String, AndroidViewComponent> entry : labels.entrySet()) {
+                setComponentVisible(entry.getValue(), false);
+                if (visibilityMap != null) visibilityMap.put(entry.getKey(), Boolean.FALSE);
+            }
+        }
+    }
+
+    @SimpleFunction(description = "Shows all text items in a Card.")
+    public void ShowAllCardTexts(String id) {
+        validateId(id);
+        HashMap<String, AndroidViewComponent> labels = this.CARD_TEXTS.get(id);
+        HashMap<String, Boolean> visibilityMap = this.CARD_TEXT_VISIBILITY.get(id);
+        if (labels != null) {
+            for (HashMap.Entry<String, AndroidViewComponent> entry : labels.entrySet()) {
+                setComponentVisible(entry.getValue(), true);
+                if (visibilityMap != null) visibilityMap.put(entry.getKey(), Boolean.TRUE);
+            }
+        }
+    }
+
+    @SimpleFunction(description = "Configures all parameters for a text item inside a Card.")
+    public void ConfigureCardText(String id, String textKey, String textValue, int fontSize, boolean isBold, int textColor, int alignment) {
+        validateId(id);
+        HashMap<String, AndroidViewComponent> labels = this.CARD_TEXTS.get(id);
+        if (labels != null && labels.containsKey(textKey)) {
+            AndroidViewComponent label = labels.get(textKey);
+            if (label != null) {
+                String safeText = (textValue == null) ? "" : textValue;
+                setSingleProp(label, "Text", safeText);
+                setSingleProp(label, "FontSize", Integer.valueOf(fontSize));
+                setSingleProp(label, "FontBold", Boolean.valueOf(isBold));
+                setSingleProp(label, "TextColor", Integer.valueOf(textColor));
+                setSingleProp(label, "TextAlignment", Integer.valueOf(alignment));
+                makeLabelClickable(label, id, textKey, safeText);
+            }
+        }
+    }
+
+    @SimpleFunction(description = "Sets the text value for a specific item.")
+    public void SetCardText(String id, String textKey, String textValue) {
+        validateId(id);
+        HashMap<String, AndroidViewComponent> labels = this.CARD_TEXTS.get(id);
+        if (labels != null && labels.containsKey(textKey)) {
+            AndroidViewComponent label = labels.get(textKey);
+            if (label != null) {
+                String safeText = (textValue == null) ? "" : textValue;
+                setSingleProp(label, "Text", safeText);
+                makeLabelClickable(label, id, textKey, safeText);
+            }
+        }
+    }
+
+    @SimpleFunction(description = "Sets the font size for a text item.")
+    public void SetCardTextFontSize(String id, String textKey, int fontSize) {
+        validateId(id);
+        HashMap<String, AndroidViewComponent> labels = this.CARD_TEXTS.get(id);
+        if (labels != null && labels.containsKey(textKey)) {
+            AndroidViewComponent label = labels.get(textKey);
+            if (label != null) setSingleProp(label, "FontSize", Integer.valueOf(fontSize));
+        }
+    }
+
+    @SimpleFunction(description = "Sets whether a text item is bold.")
+    public void SetCardTextFontBold(String id, String textKey, boolean isBold) {
+        validateId(id);
+        HashMap<String, AndroidViewComponent> labels = this.CARD_TEXTS.get(id);
+        if (labels != null && labels.containsKey(textKey)) {
+            AndroidViewComponent label = labels.get(textKey);
+            if (label != null) setSingleProp(label, "FontBold", Boolean.valueOf(isBold));
+        }
+    }
+
+    @SimpleFunction(description = "Sets the text color for a text item.")
+    public void SetCardTextColor(String id, String textKey, int textColor) {
+        validateId(id);
+        HashMap<String, AndroidViewComponent> labels = this.CARD_TEXTS.get(id);
+        if (labels != null && labels.containsKey(textKey)) {
+            AndroidViewComponent label = labels.get(textKey);
+            if (label != null) setSingleProp(label, "TextColor", Integer.valueOf(textColor));
+        }
+    }
+
+    @SimpleFunction(description = "Sets text alignment. 0=Left, 1=Center, 2=Right.")
+    public void SetCardTextAlignment(String id, String textKey, int textAlignment) {
+        validateId(id);
+        HashMap<String, AndroidViewComponent> labels = this.CARD_TEXTS.get(id);
+        if (labels != null && labels.containsKey(textKey)) {
+            AndroidViewComponent label = labels.get(textKey);
+            if (label != null) setSingleProp(label, "TextAlignment", Integer.valueOf(textAlignment));
+        }
+    }
+
+    @SimpleFunction(description = "Sets the width for a text item. -1=Automatic, -2=Fill Parent.")
+    public void SetCardTextWidth(String id, String textKey, int width) {
+        validateId(id);
+        HashMap<String, AndroidViewComponent> labels = this.CARD_TEXTS.get(id);
+        if (labels != null && labels.containsKey(textKey)) {
+            AndroidViewComponent label = labels.get(textKey);
+            if (label != null) setSingleProp(label, "Width", Integer.valueOf(width));
+        }
+    }
+
+    @SimpleFunction(description = "Sets horizontal alignment. 1=Left, 2=Right, 3=Center.")
+    public void SetCardHorizontalAlignment(String id, int align) {
+        validateId(id);
+        AndroidViewComponent column = this.CARD_COLUMNS.get(id);
+        if (column != null) setSingleProp(column, "AlignHorizontal", Integer.valueOf(align));
+    }
+
+    @SimpleFunction(description = "Sets vertical alignment. 1=Top, 2=Bottom, 3=Center.")
+    public void SetCardVerticalAlignment(String id, int align) {
+        validateId(id);
+        AndroidViewComponent column = this.CARD_COLUMNS.get(id);
+        if (column != null) setSingleProp(column, "AlignVertical", Integer.valueOf(align));
+    }
+
+    @SimpleFunction(description = "Sets responsive DP margins for a text item.")
+    public void SetTextMargins(String id, String textKey, int leftDp, int topDp, int rightDp, int bottomDp) {
+        validateId(id);
+        HashMap<String, AndroidViewComponent> labels = this.CARD_TEXTS.get(id);
+        if (labels != null && labels.containsKey(textKey)) {
+            AndroidViewComponent label = labels.get(textKey);
+            if (label != null) {
+                try {
+                    View view = getAndroidView(label);
+                    if (view != null) {
+                        float density = this.form.deviceDensity();
+                        int l = dpToPx(leftDp, density), t = dpToPx(topDp, density);
+                        int r = dpToPx(rightDp, density), b = dpToPx(bottomDp, density);
+                        if (view.getLayoutParams() instanceof ViewGroup.MarginLayoutParams) {
+                            ViewGroup.MarginLayoutParams p = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
+                            p.setMargins(l, t, r, b);
+                            view.setLayoutParams(p);
+                        } else {
+                            view.setPadding(l, t, r, b);
+                        }
+                        view.requestLayout();
+                    }
+                } catch (Exception e) { e.printStackTrace(); }
+            }
+        }
+    }
+
+    @SimpleFunction(description = "Sets the click behavior for the Card. 1=Full Surface, 2=Texts Only, 3=Mixed.")
+    public void SetCardClickMode(String id, int mode) {
+        validateId(id);
+        AndroidViewComponent card = this.CARDS.get(id);
+        if (card != null) {
+            try {
+                View rootView = getAndroidView(card);
+                if (rootView == null) return;
+                if (mode == 1) {
+                    rootView.setClickable(true); rootView.setFocusable(true);
+                    if (defaultAdvancedButtonRippleEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        android.util.TypedValue outValue = new android.util.TypedValue();
+                        this.form.$context().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+                        rootView.setForeground(this.form.$context().getDrawable(outValue.resourceId));
+                    }
+                    rootView.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { animateCardClick(id); CardClick(id); } });
+                    disableClickRecursively(rootView);
+                } else if (mode == 2) {
+                    rootView.setClickable(false); rootView.setFocusable(false); rootView.setOnClickListener(null);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) rootView.setForeground(null);
+                    enableClickRecursively(rootView, new View.OnClickListener() { @Override public void onClick(View v) {} });
+                } else {
+                    rootView.setClickable(true); rootView.setFocusable(true);
+                    if (defaultAdvancedButtonRippleEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        android.util.TypedValue outValue = new android.util.TypedValue();
+                        this.form.$context().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+                        rootView.setForeground(this.form.$context().getDrawable(outValue.resourceId));
+                    }
+                    rootView.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { animateCardClick(id); CardClick(id); } });
+                    enableClickRecursively(rootView, new View.OnClickListener() { @Override public void onClick(View v) {} });
+                }
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+    }
+
+    @SimpleFunction(description = "Enables or disables ripple/visual feedback for a specific Card.")
+    public void SetCardClickFeedback(String id, boolean enabled) {
+        validateId(id);
+        AndroidViewComponent card = this.CARDS.get(id);
+        if (card != null) {
+            try {
+                View view = getAndroidView(card);
+                if (view != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (enabled) {
+                        android.util.TypedValue outValue = new android.util.TypedValue();
+                        this.form.$context().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+                        view.setForeground(this.form.$context().getDrawable(outValue.resourceId));
+                    } else {
+                        view.setForeground(null);
+                    }
+                }
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+    }
+
+    // ============================================================
+    // LAYOUT HELPERS FOR ADVANCED BUTTON
+    // ============================================================
+    private static AndroidViewComponent createLayout(ComponentContainer parent, AndroidViewComponent image, AndroidViewComponent mainLabel, AndroidViewComponent fixedLayout, int direction, int verticalGap, int textAlignment) throws Exception {
+        switch (direction) {
+            case 0: return createLeftLayout(parent, image, mainLabel, fixedLayout, verticalGap, textAlignment);
+            case 1: return createRightLayout(parent, image, mainLabel, fixedLayout, verticalGap, textAlignment);
+            case 2: return createTopLayout(parent, image, mainLabel, fixedLayout, verticalGap, textAlignment);
+            case 3: return createBottomLayout(parent, image, mainLabel, fixedLayout, verticalGap, textAlignment);
+            default: return createLeftLayout(parent, image, mainLabel, fixedLayout, verticalGap, textAlignment);
+        }
+    }
+
+    private static AndroidViewComponent createTopLayout(ComponentContainer parent, AndroidViewComponent image, AndroidViewComponent mainLabel, AndroidViewComponent fixedLayout, int verticalGap, int textAlignment) throws Exception {
+        AndroidViewComponent container = dynCreate(parent, "VerticalArrangement");
+        setSingleProp(container, "AlignHorizontal", Integer.valueOf(1));
+        setSingleProp(container, "AlignVertical", Integer.valueOf(1));
+        setSingleProp(container, "Width", Integer.valueOf(-2));
+        setSingleProp(container, "Height", Integer.valueOf(-2));
+        ComponentContainer containerTop = asContainer(container, "VerticalArrangement");
+        if (image != null) { moveComponentToNewParent(image, container); createSpacer(containerTop, 10); }
+        AndroidViewComponent textLayout = dynCreate(containerTop, "VerticalArrangement");
+        setSingleProp(textLayout, "AlignHorizontal", Integer.valueOf(textAlignment == 0 ? 1 : (textAlignment == 2 ? 2 : 1)));
+        setSingleProp(textLayout, "AlignVertical", Integer.valueOf(1));
+        setSingleProp(textLayout, "Width", Integer.valueOf(-2));
+        setSingleProp(textLayout, "Height", Integer.valueOf(-2));
+        ComponentContainer textContainer = asContainer(textLayout, "VerticalArrangement");
+        if (mainLabel != null) { moveComponentToNewParent(mainLabel, textLayout); createSpacer(textContainer, verticalGap); }
+        if (fixedLayout != null) moveComponentToNewParent(fixedLayout, textLayout);
+        return container;
+    }
+
+    private static AndroidViewComponent createBottomLayout(ComponentContainer parent, AndroidViewComponent image, AndroidViewComponent mainLabel, AndroidViewComponent fixedLayout, int verticalGap, int textAlignment) throws Exception {
+        AndroidViewComponent container = dynCreate(parent, "VerticalArrangement");
+        setSingleProp(container, "AlignHorizontal", Integer.valueOf(1));
+        setSingleProp(container, "AlignVertical", Integer.valueOf(1));
+        setSingleProp(container, "Width", Integer.valueOf(-2));
+        setSingleProp(container, "Height", Integer.valueOf(-2));
+        ComponentContainer containerBottom = asContainer(container, "VerticalArrangement");
+        AndroidViewComponent textLayout = dynCreate(containerBottom, "VerticalArrangement");
+        setSingleProp(textLayout, "AlignHorizontal", Integer.valueOf(textAlignment == 0 ? 1 : (textAlignment == 2 ? 2 : 1)));
+        setSingleProp(textLayout, "AlignVertical", Integer.valueOf(1));
+        setSingleProp(textLayout, "Width", Integer.valueOf(-2));
+        setSingleProp(textLayout, "Height", Integer.valueOf(-2));
+        ComponentContainer textContainer = asContainer(textLayout, "VerticalArrangement");
+        if (mainLabel != null) { moveComponentToNewParent(mainLabel, textLayout); createSpacer(textContainer, verticalGap); }
+        if (fixedLayout != null) moveComponentToNewParent(fixedLayout, textLayout);
+        createSpacer(containerBottom, 10);
+        if (image != null) moveComponentToNewParent(image, container);
+        return container;
+    }
+
+    private static AndroidViewComponent createLeftLayout(ComponentContainer parent, AndroidViewComponent image, AndroidViewComponent mainLabel, AndroidViewComponent fixedLayout, int verticalGap, int textAlignment) throws Exception {
+        AndroidViewComponent container = dynCreate(parent, "HorizontalArrangement");
+        setSingleProp(container, "AlignHorizontal", Integer.valueOf(1));
+        setSingleProp(container, "AlignVertical", Integer.valueOf(1));
+        setSingleProp(container, "Width", Integer.valueOf(-2));
+        setSingleProp(container, "Height", Integer.valueOf(-2));
+        ComponentContainer containerLeft = asContainer(container, "HorizontalArrangement");
+        if (image != null) { moveComponentToNewParent(image, container); createHorizontalSpacer(containerLeft, 15); }
+        AndroidViewComponent textLayout = dynCreate(containerLeft, "VerticalArrangement");
+        setSingleProp(textLayout, "AlignHorizontal", Integer.valueOf(textAlignment == 0 ? 1 : (textAlignment == 2 ? 2 : 1)));
+        setSingleProp(textLayout, "AlignVertical", Integer.valueOf(1));
+        setSingleProp(textLayout, "Width", Integer.valueOf(-2));
+        setSingleProp(textLayout, "Height", Integer.valueOf(-2));
+        ComponentContainer textContainer = asContainer(textLayout, "VerticalArrangement");
+        if (mainLabel != null) { moveComponentToNewParent(mainLabel, textLayout); createSpacer(textContainer, verticalGap); }
+        if (fixedLayout != null) moveComponentToNewParent(fixedLayout, textLayout);
+        return container;
+    }
+
+    private static AndroidViewComponent createRightLayout(ComponentContainer parent, AndroidViewComponent image, AndroidViewComponent mainLabel, AndroidViewComponent fixedLayout, int verticalGap, int textAlignment) throws Exception {
+        AndroidViewComponent container = dynCreate(parent, "HorizontalArrangement");
+        setSingleProp(container, "AlignHorizontal", Integer.valueOf(1));
+        setSingleProp(container, "AlignVertical", Integer.valueOf(1));
+        setSingleProp(container, "Width", Integer.valueOf(-2));
+        setSingleProp(container, "Height", Integer.valueOf(-2));
+        ComponentContainer containerRight = asContainer(container, "HorizontalArrangement");
+        AndroidViewComponent textLayout = dynCreate(containerRight, "VerticalArrangement");
+        setSingleProp(textLayout, "AlignHorizontal", Integer.valueOf(textAlignment == 0 ? 1 : (textAlignment == 2 ? 2 : 1)));
+        setSingleProp(textLayout, "AlignVertical", Integer.valueOf(1));
+        setSingleProp(textLayout, "Width", Integer.valueOf(-2));
+        setSingleProp(textLayout, "Height", Integer.valueOf(-2));
+        ComponentContainer textContainer = asContainer(textLayout, "VerticalArrangement");
+        if (mainLabel != null) { moveComponentToNewParent(mainLabel, textLayout); createSpacer(textContainer, verticalGap); }
+        if (fixedLayout != null) moveComponentToNewParent(fixedLayout, textLayout);
+        if (image != null) { createHorizontalSpacer(containerRight, 15); moveComponentToNewParent(image, container); }
+        return container;
+    }
+
+    // ============================================================
+    // CORE UTILITIES
+    // ============================================================
+    private void makeLabelClickable(final AndroidViewComponent label, final String id, final String textKey, final String textValue) {
+        if (label == null) return;
+        try {
+            View view = getAndroidView(label);
+            if (view != null) {
+                view.setClickable(true); view.setFocusable(true);
+                view.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        if ("main".equals(textKey)) AdvancedButtonMainTextClick(id, textValue);
+                        else if ("fixed1".equals(textKey)) AdvancedButtonFixedText1Click(id, textValue);
+                        else if ("fixed2".equals(textKey)) AdvancedButtonFixedText2Click(id, textValue);
+                        else CardTextClick(id, textKey, textValue);
+                    }
+                });
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    private void applyImageShape(AndroidViewComponent imageComp, boolean isCircle, float cornerRadiusDp) {
+        try {
+            final View view = getAndroidView(imageComp);
+            if (view != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                final float density = this.form.deviceDensity();
+                view.setClipToOutline(true);
+                view.setOutlineProvider(new ViewOutlineProvider() {
+                    @Override
+                    public void getOutline(View v, Outline outline) {
+                        if (isCircle) {
+                            int radius = Math.min(v.getWidth(), v.getHeight()) / 2;
+                            outline.setRoundRect(0, 0, v.getWidth(), v.getHeight(), radius);
+                        } else {
+                            outline.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dpToPx((int) cornerRadiusDp, density));
+                        }
+                    }
+                });
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    private AndroidViewComponent createBaseCardView(ComponentContainer parent, String id, HashMap<String, AndroidViewComponent> labelsMap, HashMap<String, Boolean> visibilityMap) throws Exception {
+        if (parent == null) throw new YailRuntimeError("Card parent cannot be null", TAG);
+        AndroidViewComponent cardView = dynCreate(parent, "MakeroidCardView");
+        setSingleProp(cardView, "ContentPaddingBottom", Integer.valueOf(8));
+        setSingleProp(cardView, "ContentPaddingLeft", Integer.valueOf(8));
+        setSingleProp(cardView, "ContentPaddingRight", Integer.valueOf(8));
+        setSingleProp(cardView, "ContentPaddingTop", Integer.valueOf(8));
+        setSingleProp(cardView, "Width", Integer.valueOf(-2));
+        setSingleProp(cardView, "Height", Integer.valueOf(-2));
+        setSingleProp(cardView, "CornerRadius", Integer.valueOf(8));
+        setSingleProp(cardView, "BackgroundColor", Integer.valueOf(this.defaultCardBackgroundColor));
+        ComponentContainer cardContainer = asContainer(cardView, "MakeroidCardView");
+        AndroidViewComponent column = dynCreate(cardContainer, "VerticalArrangement");
+        setSingleProp(column, "AlignHorizontal", Integer.valueOf(1));
+        setSingleProp(column, "AlignVertical", Integer.valueOf(1));
+        setSingleProp(column, "Width", Integer.valueOf(-2));
+        setSingleProp(column, "Height", Integer.valueOf(-2));
+        this.CARD_COLUMNS.put(id, column);
+        ComponentContainer columnContainer = asContainer(column, "VerticalArrangement");
+        AndroidViewComponent cardImage = dynCreate(columnContainer, "Image");
+        setSingleProp(cardImage, "Width", Integer.valueOf(-2));
+        setSingleProp(cardImage, "Height", Integer.valueOf(-2));
+        this.CARD_IMAGES.put(id, cardImage);
+        AndroidViewComponent titleLabel = dynLabel(columnContainer, 16, true, this.defaultTextColor, "");
+        makeLabelClickable(titleLabel, id, "title", "");
+        labelsMap.put("title", titleLabel);
+        visibilityMap.put("title", Boolean.TRUE);
+        String[] keys = {"card", "updated", "platform", "developer", "downloads", "number"};
+        for (String key : keys) {
+            AndroidViewComponent label = dynLabel(columnContainer, 13, false, this.defaultTextColor, "");
+            makeLabelClickable(label, id, key, "");
+            labelsMap.put(key, label);
+            visibilityMap.put(key, Boolean.TRUE);
+        }
+        return cardView;
+    }
+
+    // CRITICAL FIX: Using Width = -2 (Fill Parent) to ensure text visibility
+    private static AndroidViewComponent dynLabel(ComponentContainer parent, int size, boolean isBold, int color, String text) throws Exception {
+        AndroidViewComponent label = dynCreate(parent, "Label");
+        setSingleProp(label, "Width", Integer.valueOf(-2));
+        setSingleProp(label, "Height", Integer.valueOf(-2));
+        setSingleProp(label, "FontSize", Integer.valueOf(size));
+        setSingleProp(label, "FontBold", Boolean.valueOf(isBold));
+        setSingleProp(label, "TextColor", Integer.valueOf(color));
+        setSingleProp(label, "Text", text == null ? "" : text);
+        return label;
+    }
+
+    private static void validateId(String id) {
+        if (id == null || id.trim().isEmpty()) throw new YailRuntimeError("Component id cannot be empty", TAG);
+    }
+
+    private static ComponentContainer asContainer(Component component, String name) {
+        if (!(component instanceof ComponentContainer)) throw new YailRuntimeError(name + " must be a visible Arrangement component.", TAG);
+        return (ComponentContainer) component;
+    }
+
+    private static View getAndroidView(AndroidViewComponent component) throws Exception {
+        Method method = component.getClass().getMethod("getView");
+        Object result = method.invoke(component);
+        if (!(result instanceof View)) throw new IllegalStateException("getView() did not return a View");
+        return (View) result;
+    }
+
+    private static void removeComponentFromParent(AndroidViewComponent component) {
+        if (component == null) return;
+        try {
+            View view = getAndroidView(component);
+            if (view != null) {
+                ViewGroup parent = (ViewGroup) view.getParent();
+                if (parent != null) parent.removeView(view);
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    private static void setComponentVisible(AndroidViewComponent component, boolean visible) {
+        if (component == null) return;
+        try {
+            View view = getAndroidView(component);
+            if (view != null) view.setVisibility(visible ? View.VISIBLE : View.GONE);
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    private static void moveComponentToNewParent(AndroidViewComponent component, AndroidViewComponent newParentContainer) {
+        try {
+            View view = getAndroidView(component);
+            if (view != null) {
+                ViewGroup parentGroup = (ViewGroup) view.getParent();
+                if (parentGroup != null) parentGroup.removeView(view);
+                View newParentView = getAndroidView(newParentContainer);
+                if (newParentView instanceof ViewGroup) ((ViewGroup) newParentView).addView(view);
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    private static AndroidViewComponent dynCreate(ComponentContainer parent, String name) throws Exception {
+        if (parent == null) throw new YailRuntimeError("Parent container cannot be null", TAG);
+        Class<?> cls = findClass(name);
+        Constructor<?> constructor = cls.getConstructor(ComponentContainer.class);
+        Object result = constructor.newInstance(parent);
+        if (!(result instanceof AndroidViewComponent)) throw new YailRuntimeError("Component is not AndroidViewComponent: " + name, TAG);
+        return (AndroidViewComponent) result;
+    }
+
+    private static void setSingleProp(Object component, String propertyName, Object value) {
+        if (component != null && propertyName != null) dynProp(component, propertyName, value);
+    }
+
+    private static void dynProp(Object component, String propertyName, Object value) {
+        if (component == null || propertyName == null) return;
+        Method[] methods = component.getClass().getMethods();
+        for (Method method : methods) {
+            if (!method.getName().equals(propertyName)) continue;
+            if (method.getParameterTypes().length != 1) continue;
+            try {
+                method.invoke(component, value);
+                return;
+            } catch (Exception e) { }
+        }
+    }
+
+    private static Class<?> findClass(String name) {
+        String[] packages = {"com.google.appinventor.components.runtime.", "io.makeroid.components.", "com.niotron.components.", "io.kodular.components."};
+        for (String packageName : packages) {
+            try { return Class.forName(packageName + name); } catch (ClassNotFoundException e) { }
+        }
+        throw new YailRuntimeError("Component not found: " + name, TAG);
+    }
+
+    private static String safeMessage(Exception exception) {
+        if (exception == null) return "Unknown error";
+        String message = exception.getMessage();
+        return (message == null || message.isEmpty()) ? exception.getClass().getSimpleName() : message;
+    }
+
+    private void makeButtonClickable(final AndroidViewComponent component, final String id) {
+        if (component == null) return;
+        try {
+            View view = getAndroidView(component);
+            if (view == null) throw new IllegalStateException("Button View is null");
+            view.setClickable(true); view.setFocusable(true);
+            view.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { ButtonClick(id); } });
+        } catch (Exception e) { throw new YailRuntimeError("Click listener error: " + safeMessage(e), TAG); }
+    }
+
+    private void makeAdvancedButtonClickable(final String id) {
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components == null || components.card == null) return;
+        try {
+            final View view = getAndroidView(components.card);
+            if (view == null) return;
+            view.setClickable(true); view.setFocusable(true);
+            if (this.defaultAdvancedButtonRippleEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                android.util.TypedValue outValue = new android.util.TypedValue();
+                this.form.$context().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+                view.setForeground(this.form.$context().getDrawable(outValue.resourceId));
+            }
+            view.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (components.clickFeedbackEnabled) animateButtonClick(id);
+                    AdvancedButtonClick(id);
+                }
+            });
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    private void animateButtonClick(final String id) {
+        AdvancedButtonComponents components = this.ADVANCED_BUTTON_DATA.get(id);
+        if (components == null || components.card == null) return;
+        try {
+            final View view = getAndroidView(components.card);
+            if (view == null) return;
+            final int duration = this.defaultAdvancedButtonClickAnimationDuration;
+            view.animate().scaleX(0.95f).scaleY(0.95f).setDuration(duration).withEndAction(new Runnable() {
+                @Override public void run() { view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(duration).start(); }
+            }).start();
+            int originalColor = components.originalBackgroundColor;
+            int pressedColor = darkenColor(originalColor);
+            setSingleProp(components.card, "BackgroundColor", Integer.valueOf(pressedColor));
+            view.postDelayed(new Runnable() {
+                @Override public void run() { setSingleProp(components.card, "BackgroundColor", Integer.valueOf(originalColor)); }
+            }, duration * 2);
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    private void animateCardClick(final String id) {
+        AndroidViewComponent card = this.CARDS.get(id);
+        if (card == null) return;
+        try {
+            final View view = getAndroidView(card);
+            if (view == null) return;
+            final int duration = this.defaultAdvancedButtonClickAnimationDuration;
+            view.animate().scaleX(0.95f).scaleY(0.95f).setDuration(duration).withEndAction(new Runnable() {
+                @Override public void run() { view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(duration).start(); }
+            }).start();
+            Integer originalColorObj = this.CARD_ORIGINAL_COLORS.get(id);
+            if (originalColorObj != null) {
+                int originalColor = originalColorObj.intValue();
+                int pressedColor = darkenColor(originalColor);
+                setSingleProp(card, "BackgroundColor", Integer.valueOf(pressedColor));
+                view.postDelayed(new Runnable() {
+                    @Override public void run() { setSingleProp(card, "BackgroundColor", Integer.valueOf(originalColor)); }
+                }, duration * 2);
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    private static int darkenColor(int color) {
+        float[] hsv = new float[3];
+        android.graphics.Color.colorToHSV(color, hsv);
+        hsv[2] *= 0.8f;
+        return android.graphics.Color.HSVToColor(hsv);
+    }
+
+    private static void createSpacer(ComponentContainer parent, int heightDp) throws Exception {
+        AndroidViewComponent spacer = dynCreate(parent, "Label");
+        setSingleProp(spacer, "Text", "");
+        setSingleProp(spacer, "Height", Integer.valueOf(heightDp));
+        setSingleProp(spacer, "Width", Integer.valueOf(-2));
+        setSingleProp(spacer, "FontSize", Integer.valueOf(1));
+        setSingleProp(spacer, "TextColor", Integer.valueOf(0x00000000));
+    }
+
+    private static void createHorizontalSpacer(ComponentContainer parent, int widthDp) throws Exception {
+        AndroidViewComponent spacer = dynCreate(parent, "Label");
+        setSingleProp(spacer, "Text", "");
+        setSingleProp(spacer, "Width", Integer.valueOf(widthDp));
+        setSingleProp(spacer, "Height", Integer.valueOf(-2));
+        setSingleProp(spacer, "FontSize", Integer.valueOf(1));
+        setSingleProp(spacer, "TextColor", Integer.valueOf(0x00000000));
+    }
+
+    private void enableClickRecursively(View view, View.OnClickListener listener) {
+        view.setOnClickListener(listener);
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                enableClickRecursively(group.getChildAt(i), listener);
+            }
+        }
+    }
+
+    private void disableClickRecursively(View view) {
+        view.setOnClickListener(null);
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                disableClickRecursively(group.getChildAt(i));
+            }
+        }
+    }
+
+    public static int dpToPx(int dp, float density) {
+        return Math.round(dp * density);
+    }
+}
